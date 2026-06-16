@@ -236,7 +236,8 @@ set(ES_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ApiSystem.cpp # batocera
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ZaparooSupport.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/LibretroRatio.cpp # batocera
-	${CMAKE_CURRENT_SOURCE_DIR}/src/Win32ApiSystem.cpp # batocera
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Win32ApiSystem.cpp # batocera
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/AndroidApiSystem.cpp # Android
 )
 
 #-------------------------------------------------------------------------------
@@ -265,19 +266,26 @@ endif()
 #-------------------------------------------------------------------------------
 # define target
 include_directories(${COMMON_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/src)
-add_executable(emulationstation ${ES_SOURCES} ${ES_HEADERS})
-target_link_libraries(emulationstation ${COMMON_LIBRARIES} es-core)
 
-# special properties for Windows builds
-if(MSVC)
-    # Always compile with the "WINDOWS" subsystem to avoid console window flashing at startup
-    # when --debug is not set (see es-core/src/main.cpp for explanation).
-    # The console will still be shown if launched with --debug.
-    # Note that up to CMake 2.8.10 this feature is broken: http://public.kitware.com/Bug/view.php?id=12566
-    set_target_properties(emulationstation PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:WINDOWS")
-    set_target_properties(emulationstation PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:WINDOWS")
-    set_target_properties(emulationstation PROPERTIES LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
-    set_target_properties(emulationstation PROPERTIES LINK_FLAGS_MINSIZEREL "/SUBSYSTEM:WINDOWS")
+if(ANDROID)
+    # Android: SDL2 loads libmain.so from Java via System.loadLibrary("main")
+    add_library(main SHARED ${ES_SOURCES} ${ES_HEADERS})
+    target_link_libraries(main ${COMMON_LIBRARIES} es-core)
+else()
+    add_executable(emulationstation ${ES_SOURCES} ${ES_HEADERS})
+    target_link_libraries(emulationstation ${COMMON_LIBRARIES} es-core)
+
+    # special properties for Windows builds
+    if(MSVC)
+        # Always compile with the "WINDOWS" subsystem to avoid console window flashing at startup
+        # when --debug is not set (see es-core/src/main.cpp for explanation).
+        # The console will still be shown if launched with --debug.
+        # Note that up to CMake 2.8.10 this feature is broken: http://public.kitware.com/Bug/view.php?id=12566
+        set_target_properties(emulationstation PROPERTIES LINK_FLAGS_DEBUG "/SUBSYSTEM:WINDOWS")
+        set_target_properties(emulationstation PROPERTIES LINK_FLAGS_RELWITHDEBINFO "/SUBSYSTEM:WINDOWS")
+        set_target_properties(emulationstation PROPERTIES LINK_FLAGS_RELEASE "/SUBSYSTEM:WINDOWS")
+        set_target_properties(emulationstation PROPERTIES LINK_FLAGS_MINSIZEREL "/SUBSYSTEM:WINDOWS")
+    endif()
 endif()
 
 

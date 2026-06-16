@@ -59,6 +59,27 @@ endif()
 
 project(emulationstation-all)
 
+#-------------------------------------------------------------------------------
+# Android NDK cross-compilation support
+# The NDK CMake toolchain sets ANDROID automatically; we honour it here.
+if(ANDROID)
+    message("-- Android NDK build (ABI: ${ANDROID_ABI}, API: ${ANDROID_PLATFORM})")
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    # Force GLES2 — the renderer that works on all Android devices
+    set(GLES2 ON  CACHE BOOL "Force GLES2 for Android" FORCE)
+    set(GL   OFF  CACHE BOOL "" FORCE)
+    set(GLES OFF  CACHE BOOL "" FORCE)
+    # Disable features that have no Android equivalent yet
+    set(CEC          OFF CACHE BOOL "" FORCE)
+    set(ENABLE_TTS   OFF CACHE BOOL "" FORCE)
+    set(ENABLE_PULSE OFF CACHE BOOL "" FORCE)
+    set(DISABLE_KODI ON  CACHE BOOL "" FORCE)
+    set(BATOCERA     OFF CACHE BOOL "" FORCE)
+    set(RETROBAT     OFF CACHE BOOL "" FORCE)
+    add_definitions(-DANDROID_BUILD)
+endif()
+
 # Win32 custom directories assignation
 if(WIN32 AND CUSTOM_LIBDIR)
 	if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -169,12 +190,18 @@ find_package(FreeImage REQUIRED)
 # batocera / background musics
 find_package(SDL2MIXER REQUIRED)
 # batocera / customisations
-find_package(SDL2 REQUIRED)
+# On Android, SDL2 is built from source in external/SDL2 (added via add_subdirectory).
+# The NDK toolchain does not provide SDL2 via find_package.
+if(NOT ANDROID)
+    find_package(SDL2 REQUIRED)
+endif()
 find_package(CURL REQUIRED)
-find_package(VLC REQUIRED)
+if(NOT ANDROID)
+    find_package(VLC REQUIRED)
+endif()
 find_package(RapidJSON REQUIRED)
 
-if(NOT WIN32)
+if(NOT WIN32 AND NOT ANDROID)
 	if(ENABLE_PULSE)
 	  MESSAGE("pulse audio enabled")
 	  find_package(PulseAudio REQUIRED)
@@ -190,7 +217,7 @@ if(NOT WIN32)
 	else()
 	  MESSAGE("udev not found. guns will be disabled")
 	endif()
-	
+
 	if(ENABLE_TTS)
 	  MESSAGE("tts enabled")
 	  find_library(LIBESPEAK_LIBRARIES NAMES espeak REQUIRED)
@@ -210,8 +237,8 @@ if(NOT WIN32)
 	endif()
 endif()
 
-#add ALSA for Linux
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+#add ALSA for Linux (not needed on Android — SDL2 handles audio via OpenSL ES / AAudio)
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux" AND NOT ANDROID)
     find_package(ALSA REQUIRED)
 endif()
 
@@ -289,19 +316,29 @@ endif()
 
 #-------------------------------------------------------------------------------
 #add include directories
+if(ANDROID)
+    # SDL2 built from source; headers live in external/SDL2/include
+    set(_SDL2_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/SDL2/include")
+else()
+    set(_SDL2_INCLUDE_DIR ${SDL2_INCLUDE_DIR})
+endif()
+
 set(COMMON_INCLUDE_DIRS
     ${FREETYPE_INCLUDE_DIRS}
     ${FreeImage_INCLUDE_DIRS}
     # batocera / background musics
     ${SDLMIXER_INCLUDE_DIR}
-    # batocera / customisations    
-    ${SDL2_INCLUDE_DIR}
+    # batocera / customisations
+    ${_SDL2_INCLUDE_DIR}
     ${CURL_INCLUDE_DIR}
-    ${VLC_INCLUDE_DIR}
     ${RAPIDJSON_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/external
     ${CMAKE_CURRENT_SOURCE_DIR}/es-core/src
 )
+
+if(NOT ANDROID)
+    list(APPEND COMMON_INCLUDE_DIRS ${VLC_INCLUDE_DIR})
+endif()
 
 if(ENABLE_PULSE)
  LIST(APPEND COMMON_INCLUDE_DIRS
@@ -371,20 +408,41 @@ elseif(DEFINED VERO4K)
     )
 endif()
 
+if(ANDROID)
+    # SDL2 built from source as CMake target; SDL2_mixer via find_package (vcpkg arm64-android)
+    set(_SDL2_LIB SDL2)
+else()
+    set(_SDL2_LIB ${SDL2_LIBRARY})
+endif()
+
 set(COMMON_LIBRARIES
     ${FREETYPE_LIBRARIES}
     ${FreeImage_LIBRARIES}
-    ${SDL2_LIBRARY}
+    ${_SDL2_LIB}
     # batocera / background musics
     ${SDLMIXER_LIBRARY}
-    # batocera / customisations    
+    # batocera / customisations
     ${CURL_LIBRARIES}
-    ${VLC_LIBRARIES}
     pugixml
     nanosvg
     id3v2
-	libcheevos	
+    libcheevos
 )
+
+if(NOT ANDROID)
+    list(APPEND COMMON_LIBRARIES ${VLC_LIBRARIES})
+endif()
+
+if(ANDROID)
+    # Android system libraries required by SDL2 + GLES2 + logging
+    list(APPEND COMMON_LIBRARIES
+        android
+        log
+        EGL
+        GLESv2
+        OpenSLES
+    )
+endif()
 
 if(UDEV_FOUND)
  LIST(APPEND COMMON_LIBRARIES
@@ -420,8 +478,8 @@ if(CEC)
   endif()
 endif()
 
-#add ALSA for Linux
-if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+#add ALSA for Linux (not Android)
+if(${CMAKE_SYSTEM_NAME} MATCHES "Linux" AND NOT ANDROID)
     LIST(APPEND COMMON_LIBRARIES
         ${ALSA_LIBRARY}
     )
@@ -442,7 +500,7 @@ elseif(DEFINED VERO4K)
         EGL
         ${OPENGLES_LIBRARIES}
     )
-else()
+elseif(NOT ANDROID)
     if(MSVC)
         LIST(APPEND COMMON_LIBRARIES
             winmm
@@ -464,8 +522,9 @@ else()
         )
     endif()
 endif()
+# Android OpenGL/EGL libs are already added in the ANDROID block above
 
-if(NOT WIN32)
+if(NOT WIN32 AND NOT ANDROID)
 	# batocera / i18n
 	# i18n
 	find_program (MSGFMT_EXECUTABLE msgfmt)

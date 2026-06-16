@@ -7,6 +7,10 @@
 #include "utils/FileSystemUtil.h"
 #include "utils/StringUtil.h"
 
+#ifdef __ANDROID__
+#include <SDL.h>
+#endif
+
 Paths* Paths::_instance = nullptr;
 
 #ifdef WIN32
@@ -45,7 +49,32 @@ Paths::Paths()
 
 	// Here, BATOCERA & Forks can define their own paths
 
-#if BATOCERA
+#if defined(__ANDROID__)
+	{
+		// Internal storage: private app data (/data/data/<pkg>)
+		const char* internalPath = SDL_AndroidGetInternalStoragePath();
+		// External storage: shared media storage (may be SD card or /sdcard/Android/data/<pkg>)
+		const char* externalPath = SDL_AndroidGetExternalStoragePath();
+
+		std::string internal = internalPath ? internalPath : "";
+		std::string external = externalPath ? externalPath : internal;
+
+		mUserEmulationStationPath = internal + "/es";
+		mLogPath = internal + "/logs";
+		mEmulationStationPath = internal;
+
+		// Rooted path for ROMs/themes on external storage
+		mRootPath = external;
+		mThemesPath = external + "/themes";
+		mUserThemesPath = external + "/themes";
+		mMusicPath = external + "/music";
+		mUserMusicPath = external + "/music";
+		mScreenShotsPath = external + "/screenshots";
+		mSaveStatesPath = external + "/saves";
+		mSystemConfFilePath = mUserEmulationStationPath + "/emulationstation.cfg";
+		mUserManualPath = "";
+	}
+#elif BATOCERA
 	mRootPath = "/userdata";
 	mEmulationStationPath = "/usr/share/emulationstation";
 	mUserEmulationStationPath = "/userdata/system/configs/emulationstation";

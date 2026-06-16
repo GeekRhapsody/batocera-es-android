@@ -5,6 +5,14 @@
 #if WIN32
 #include <codecvt>
 #include <windows.h>
+#elif defined(__ANDROID__)
+#include <sys/types.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <sys/stat.h>
+#include <arpa/inet.h>
+// getifaddrs is available on Android API 24+; we target 26+
+#include <ifaddrs.h>
 #else
 #include <sys/types.h>
 #include <unistd.h>
@@ -167,6 +175,12 @@ namespace Utils
 			  return WEXITSTATUS(n);
 			}
 
+#ifdef __ANDROID__
+			// Android does not support fork() in app processes.
+			// Launching external processes on Android requires Intents (handled in Java).
+			LOG(LogWarning) << "ProcessStartInfo: async launch not supported on Android: " << command;
+			return 1;
+#else
 			// fork the current process
 			pid_t ret = fork();
 			if (ret == 0)
@@ -189,7 +203,8 @@ namespace Utils
 			}
 
 			return 0;
-#endif
+#endif // __ANDROID__
+#endif // WIN32
 		}
 
 		int runShutdownCommand()
@@ -598,10 +613,12 @@ namespace Utils
 
 			return result;
 		}
+#elif defined(__ANDROID__)
+		bool isBuildroot() { return false; }
 #else
-		bool isBuildroot() 
+		bool isBuildroot()
 		{
-			static const bool cached = []() 
+			static const bool cached = []()
 			{
 				std::ifstream f("/etc/os-release");
 				if (!f)
@@ -623,6 +640,8 @@ namespace Utils
 		{
 #if WIN32
 			return "windows";
+#elif defined(__ANDROID__)
+			return "arm64-v8a";
 #else
 			std::string arch = Utils::FileSystem::readAllText("/usr/share/batocera/batocera.arch");
 			if (!arch.empty())

@@ -25,17 +25,24 @@
 #include "LocaleES.h"
 #include <SystemConf.h>
 #include "ApiSystem.h"
+#ifdef __ANDROID__
+#include "AndroidApiSystem.h"
+#endif
 #include "AudioManager.h"
 #include "NetworkThread.h"
 #include "scrapers/ThreadedScraper.h"
 #include "ThreadedHasher.h"
 #include <FreeImage.h>
 #include "ImageIO.h"
+#ifndef __ANDROID__
 #include "components/VideoVlcComponent.h"
+#endif
 #include <csignal>
 #include "InputConfig.h"
 #include "RetroAchievements.h"
+#ifndef __ANDROID__
 #include "TextToSpeech.h"
+#endif
 #include "Paths.h"
 #include "resources/TextureData.h"
 #include "Scripting.h"
@@ -444,7 +451,12 @@ void launchStartupGame()
 // #include "utils/MathExpr.h"
 
 int main(int argc, char* argv[])
-{	
+{
+#ifdef __ANDROID__
+	// Set the Android platform implementation before anything calls ApiSystem::getInstance()
+	ApiSystem::setInstance(new AndroidApiSystem());
+#endif
+
 	// Utils::MathExpr::performUnitTests();
 
 	// signal(SIGABRT, signalHandler);
@@ -529,7 +541,9 @@ int main(int argc, char* argv[])
 
 	// Threaded initializations
 	auto threadPool = new Utils::ThreadPool("main()", -3);
+#ifndef __ANDROID__
 	auto vlcInit = threadPool->queueWorkItem([] { VideoVlcComponent::init(); });
+#endif
 	threadPool->queueWorkItem([] { ApiSystem::getInstance()->getIpAddress(); });
 	threadPool->queueWorkItem([] { MetaDataList::initMetadata(); });
 	threadPool->queueWorkItem([] { MameNames::init(); });
@@ -568,7 +582,11 @@ int main(int argc, char* argv[])
 	if (ApiSystem::getInstance()->isScriptingSupported(ApiSystem::PDFEXTRACTION))
 		TextureData::PdfHandler = ApiSystem::getInstance();
 	
+#ifndef __ANDROID__
 	threadPool->waitAllExcept(vlcInit); // Wait for what's necessary for loadSystemConfigFile
+#else
+	threadPool->wait(); // Android has no vlcInit task to skip
+#endif
 
 	const char* errorMsg = NULL;
 	if (!loadSystemConfigFile(splashScreen && splashScreenProgress ? &window : nullptr, &errorMsg))

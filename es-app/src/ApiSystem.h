@@ -178,6 +178,7 @@ public:
 	virtual bool isScriptingSupported(ScriptId script);
 
     static ApiSystem* getInstance();
+    static void setInstance(ApiSystem* inst);
 	virtual void deinit() { };
 
     virtual unsigned long getFreeSpaceGB(std::string mountpoint);

@@ -1,0 +1,68 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.es.android'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'org.es.android'
+        minSdk 26
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+
+        externalNativeBuild {
+            cmake {
+                // Pass to root CMakeLists.txt; ANDROID is set automatically by the NDK toolchain.
+                // These args disable Linux-only features and force GLES2.
+                arguments '-DGLES2=ON',
+                          '-DGL=OFF',
+                          '-DGLES=OFF',
+                          '-DCEC=OFF',
+                          '-DENABLE_TTS=OFF',
+                          '-DENABLE_PULSE=OFF',
+                          '-DDISABLE_KODI=ON',
+                          '-DBATOCERA=OFF',
+                          '-DRETROBAT=OFF',
+                          '-DUSE_SYSTEM_PUGIXML=OFF'
+                abiFilters 'arm64-v8a'
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            // Path relative to this build.gradle file (android/app/)
+            path '../../CMakeLists.txt'
+            version '3.22.1'
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            jniDebuggable true
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    // Pull in SDL2 Java sources from the SDL2 submodule
+    sourceSets {
+        main {
+            java.srcDirs = [
+                'src/main/java',
+                '../../external/SDL2/android-project/app/src/main/java'
+            ]
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}

@@ -81,7 +81,7 @@ ApiSystem::ApiSystem() { }
 ApiSystem* ApiSystem::instance = nullptr;
 ApiSystem::LED_TYPE ApiSystem::mSystemLedType = ApiSystem::LED_TYPE_NONE;
 
-ApiSystem *ApiSystem::getInstance() 
+ApiSystem *ApiSystem::getInstance()
 {
 	if (ApiSystem::instance == nullptr)
 	{
@@ -90,11 +90,19 @@ ApiSystem *ApiSystem::getInstance()
 #else
 		ApiSystem::instance = new ApiSystem();
 #endif
-		
 		IExternalActivity::Instance = ApiSystem::instance;
 	}
 
 	return ApiSystem::instance;
+}
+
+void ApiSystem::setInstance(ApiSystem* inst)
+{
+	if (ApiSystem::instance != nullptr)
+		delete ApiSystem::instance;
+
+	ApiSystem::instance = inst;
+	IExternalActivity::Instance = inst;
 }
 
 unsigned long ApiSystem::getFreeSpaceGB(std::string mountpoint) 
